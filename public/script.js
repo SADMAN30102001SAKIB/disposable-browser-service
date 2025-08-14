@@ -1,30 +1,50 @@
-let currentSession = null;
+let activeSessions = new Map(); // Store multiple sessions
 
 // Load stats on page load
 document.addEventListener("DOMContentLoaded", () => {
   loadStats();
+  loadExistingSessions(); // Load any existing sessions from backend
   setInterval(loadStats, 10000); // Update every 10 seconds
 
   // Add event listeners for buttons
   const launchBtn = document.getElementById("launchBtn");
-  const openBrowserBtn = document.getElementById("openBrowserBtn");
-  const terminateSessionBtn = document.getElementById("terminateSessionBtn");
 
   if (launchBtn) {
     launchBtn.addEventListener("click", launchBrowser);
   }
 
-  if (openBrowserBtn) {
-    openBrowserBtn.addEventListener("click", openBrowser);
-  }
-
-  if (terminateSessionBtn) {
-    terminateSessionBtn.addEventListener("click", terminateSession);
-  }
-
   // Auto-refresh stats when window gains focus
-  window.addEventListener("focus", loadStats);
+  window.addEventListener("focus", () => {
+    loadStats();
+    loadExistingSessions();
+  });
 });
+
+async function loadExistingSessions() {
+  try {
+    const response = await fetch("/api/sessions");
+    const data = await response.json();
+
+    // Clear current sessions and reload from backend
+    activeSessions.clear();
+
+    // Restore sessions from backend
+    if (data.sessions && data.sessions.length > 0) {
+      data.sessions.forEach(session => {
+        activeSessions.set(session.sessionId, session);
+      });
+
+      // Update UI
+      updateSessionsList();
+      document.getElementById("sessionsContainer").classList.add("show");
+    } else {
+      // No sessions, hide container
+      document.getElementById("sessionsContainer").classList.remove("show");
+    }
+  } catch (error) {
+    console.error("Error loading existing sessions:", error);
+  }
+}
 
 async function loadStats() {
   try {
@@ -35,6 +55,16 @@ async function loadStats() {
       stats.activeSessions;
     document.getElementById("availablePorts").textContent =
       stats.availablePorts;
+
+    // Show/hide sessions container based on actual backend stats
+    const sessionsContainer = document.getElementById("sessionsContainer");
+    if (stats.activeSessions === 0) {
+      sessionsContainer.classList.remove("show");
+      activeSessions.clear(); // Clear frontend state if backend has no sessions
+    } else if (stats.activeSessions > 0 && activeSessions.size === 0) {
+      // Backend has sessions but frontend doesn't - reload them
+      loadExistingSessions();
+    }
   } catch (error) {
     console.error("Error loading stats:", error);
   }
@@ -43,11 +73,10 @@ async function loadStats() {
 async function launchBrowser() {
   const launchBtn = document.getElementById("launchBtn");
   const loading = document.getElementById("loading");
-  const sessionInfo = document.getElementById("sessionInfo");
+  const sessionsContainer = document.getElementById("sessionsContainer");
   const errorDiv = document.getElementById("error");
 
-  // Reset UI
-  sessionInfo.classList.remove("show");
+  // Reset error
   errorDiv.classList.remove("show");
 
   // Show loading
@@ -68,13 +97,12 @@ async function launchBrowser() {
       throw new Error(data.error || "Failed to create session");
     }
 
-    // Store session info
-    currentSession = data;
+    // Add session to our list
+    activeSessions.set(data.sessionId, data);
 
     // Update UI
-    document.getElementById("sessionId").textContent = data.sessionId;
-    document.getElementById("sessionUrl").textContent = data.url;
-    sessionInfo.classList.add("show");
+    updateSessionsList();
+    sessionsContainer.classList.add("show");
 
     // Update stats
     loadStats();
@@ -89,24 +117,64 @@ async function launchBrowser() {
   }
 }
 
-function openBrowser() {
-  if (currentSession && currentSession.url) {
-    window.open(currentSession.url, "_blank");
+function updateSessionsList() {
+  const sessionsList = document.getElementById("sessionsList");
+  sessionsList.innerHTML = "";
+
+  activeSessions.forEach((session, sessionId) => {
+    const sessionItem = document.createElement("div");
+    sessionItem.className = "session-item";
+    sessionItem.innerHTML = `
+      <div class="session-header">
+        <strong>🌐 Browser Session</strong>
+        <span class="session-id">${sessionId.substring(0, 8)}...</span>
+      </div>
+      <div class="session-url">${session.url || "URL not available"}</div>
+      <div class="session-actions">
+        <button class="btn btn-primary" data-session-id="${sessionId}" data-action="open">
+          🌐 Open Browser
+        </button>
+        <button class="btn btn-danger" data-session-id="${sessionId}" data-action="terminate">
+          🗑️ Terminate
+        </button>
+      </div>
+    `;
+
+    // Add event listeners for the buttons
+    const openBtn = sessionItem.querySelector('[data-action="open"]');
+    const terminateBtn = sessionItem.querySelector('[data-action="terminate"]');
+
+    openBtn.addEventListener("click", () => openBrowser(sessionId));
+    terminateBtn.addEventListener("click", () => terminateSession(sessionId));
+
+    sessionsList.appendChild(sessionItem);
+  });
+}
+
+function openBrowser(sessionId) {
+  const session = activeSessions.get(sessionId);
+  if (session && session.url) {
+    window.open(session.url, "_blank");
   }
 }
 
-async function terminateSession() {
-  if (!currentSession) return;
-
+async function terminateSession(sessionId) {
   try {
-    const response = await fetch(`/api/session/${currentSession.sessionId}`, {
+    const response = await fetch(`/api/session/${sessionId}`, {
       method: "DELETE",
     });
 
     if (response.ok) {
-      // Reset UI
-      document.getElementById("sessionInfo").classList.remove("show");
-      currentSession = null;
+      // Remove session from our list
+      activeSessions.delete(sessionId);
+
+      // Update UI
+      updateSessionsList();
+
+      // Hide container if no sessions left
+      if (activeSessions.size === 0) {
+        document.getElementById("sessionsContainer").classList.remove("show");
+      }
 
       // Update stats
       loadStats();

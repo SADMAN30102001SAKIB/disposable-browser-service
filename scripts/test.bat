@@ -5,7 +5,7 @@ REM This script tests the API endpoints and basic functionality
 echo 🧪 Testing Disposable Browser Service API
 echo =======================================
 
-set API_BASE=http://localhost:3000/api
+set API_BASE=http://localhost/api
 set SESSION_ID=
 
 REM Test health check

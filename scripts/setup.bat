@@ -25,7 +25,7 @@ echo ✅ Docker is installed and running
 
 REM Build the browser container image
 echo 🔨 Building disposable browser container...
-docker build -t disposable-browser .
+docker build -t disposable-browser .\docker
 
 if %ERRORLEVEL% neq 0 (
     echo ❌ Failed to build browser container
@@ -35,25 +35,12 @@ if %ERRORLEVEL% neq 0 (
 
 echo ✅ Browser container built successfully
 
-REM Install Node.js dependencies
-echo 📦 Installing Node.js dependencies...
-npm --version >nul 2>&1
-if %ERRORLEVEL% equ 0 (
-    npm install
-    echo ✅ Dependencies installed successfully
-) else (
-    echo ⚠️  npm not found. Will use Docker for backend.
-)
-
-REM Create logs directory
-if not exist logs mkdir logs
-
 echo.
 echo 🎉 Setup completed successfully!
 echo.
 echo 🚀 To start the service:
 echo    Option 1 - Using Docker Compose (recommended):
-echo    docker-compose up -d
+echo    docker compose up -d --build
 echo.
 echo    Option 2 - Manual start:
 echo    1. Start backend: node server.js

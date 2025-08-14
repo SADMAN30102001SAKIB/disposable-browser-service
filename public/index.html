@@ -35,33 +35,14 @@
 
       <div class="error" id="error"></div>
 
-      <div class="session-info" id="sessionInfo">
-        <h3>🎉 Your Browser is Ready!</h3>
-        <p>Session ID: <span id="sessionId"></span></p>
-        <div class="session-url" id="sessionUrl"></div>
-        <div class="session-actions">
-          <button class="btn btn-primary" id="openBrowserBtn">
-            🌐 Open Browser
-          </button>
-          <button class="btn btn-danger" id="terminateSessionBtn">
-            🗑️ Terminate Session
-          </button>
+      <div class="sessions-container" id="sessionsContainer">
+        <h3>🎉 Your Active Browser Sessions</h3>
+        <div class="sessions-list" id="sessionsList">
+          <!-- Sessions will be dynamically added here -->
         </div>
         <p style="margin-top: 1rem; color: #666; font-size: 0.9rem">
-          ⏰ Session will auto-expire in 30 minutes
+          ⏰ Sessions will auto-expire in 30 minutes
         </p>
-      </div>
-
-      <div class="features">
-        <h3>🔒 Security Features</h3>
-        <ul>
-          <li>Complete isolation - each session runs in its own container</li>
-          <li>No data persistence - everything is wiped when session ends</li>
-          <li>Resource limits - CPU and memory constraints prevent abuse</li>
-          <li>Auto-cleanup - sessions expire automatically after 30 minutes</li>
-          <li>Incognito mode - no browsing history or cookies saved</li>
-          <li>Sandboxed environment - secure from host system</li>
-        </ul>
       </div>
     </div>
 

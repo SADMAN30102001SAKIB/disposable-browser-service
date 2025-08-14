@@ -117,7 +117,7 @@ body {
   }
 }
 
-.session-info {
+.sessions-container {
   background: #e8f5e8;
   border: 1px solid #4caf50;
   border-radius: 10px;
@@ -126,8 +126,38 @@ body {
   display: none;
 }
 
-.session-info.show {
+.sessions-container.show {
   display: block;
+}
+
+.sessions-list {
+  margin: 1rem 0;
+}
+
+.session-item {
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0.5rem 0;
+  text-align: left;
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.session-id {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #666;
+  background: #fff;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  border: 1px solid #e0e0e0;
 }
 
 .session-url {

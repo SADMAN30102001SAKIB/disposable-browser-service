@@ -2,73 +2,103 @@
 
 A **production-ready disposable browser service** that creates isolated, ephemeral browser sessions using Docker containers. Each user gets their own secure browser environment that's automatically destroyed when they're done.
 
-## 📊 Current Status
+### ⚠️ **BREAKING CHANGE NOTICE**
 
-✅ **FULLY FUNCTIONAL** - The service is running and ready to use!
+**Version 2.0**: This version introduces Redis-based session management for proper multi-backend scaling. If upgrading from a previous version:
 
-- ✅ Docker image built successfully
-- ✅ Backend service running on port 3000
-- ✅ Web interface accessible and beautiful
-- ✅ Container creation and cleanup working
-- ✅ Security measures implemented
-- ✅ Error handling and monitoring active
-- ✅ Documentation complete
-
-### 🔒 Security & Isolation
-
-- **Complete container isolation** - Each session runs in its own Docker container
-- **No data persistence** - All browsing data is wiped when session ends
-- **Resource limits** - CPU and memory constraints prevent abuse
-- **Non-root execution** - Browser runs as unprivileged user
-- **Auto-cleanup** - Sessions expire after 30 minutes
-
-### 🎛️ Management & Scale
-
-- **Multi-session support** - Up to 100 concurrent users
-- **Port management** - Dynamic port allocation (50000-60000)
-- **Real-time monitoring** - Live session statistics
-- **Health checks** - API endpoint monitoring
-- **Graceful shutdown** - Proper cleanup on service stop
-
-### 🌐 User Experience
-
-- **Beautiful web interface** - Modern, responsive design
-- **One-click launch** - Instant browser session creation
-- **Real-time stats** - See active sessions and available slots
-- **Mobile-friendly** - Works on phones and tablets
-- **Error handling** - Clear error messages and recovery
+1. **New dependency**: Redis is now **required** (included in docker-compose.yml)
+2. **Enhanced scaling**: All backend replicas now share session data consistently
+3. **Better load balancing**: Frontend shows consistent session counts regardless of backend routing
 
 ### 🔧 Technical Stack
 
 - **Backend**: Node.js + Express.js + Dockerode
-- **Frontend**: Pure HTML/CSS/JavaScript (no frameworks yet)
-- **Container**: Ubuntu 22.04 + Chromium + VNC + noVNC
-- **Process Management**: Supervisor
 - **Security**: Helmet.js, CORS, non-root containers
+- **Load Balancer & Reverse Proxy**: Traefik (ports 80, 8080)
+- **Redis Coordination**:
+  - **Port Allocation** (`portAllocator.js`): Prevents host port conflicts across backend replicas
+  - **Session Management** (`sessionManager.js`): Shares session data across all backend instances
+- **Docker Container**: Backends (internal port 3000) & Browsers (Ubuntu + Chrome + Xvfb + VNC)
+- **Process Management**: Supervisor
+- **Frontend (not main focus)**: HTML/CSS/JavaScript (no frameworks yet)
+
+## 📈 Performance & Scaling
+
+### Browser Resource Usage (per session)
+
+- **Per session**: ~512MB RAM, 0.5-1 CPU core
+- **50 sessions**: ~25GB RAM, 25-50 CPU cores
+- **Startup time**: ~2-5 seconds
+- **Network**: ~10Mbps per active session
+- **Storage**: Minimal (containers are ephemeral)
+
+### Scaling Recommendations
+
+- **Small deployment**: 1 server, 10-20 sessions
+- **Medium deployment**: 3-5 servers, 100-500 sessions
+- **Large deployment**: Kubernetes cluster, 1000+ sessions
+- **Horizontal scaling**: Run multiple backend instances
+- **Load balancing**: Use Nginx
+- **Container pre-warming**: Keep idle containers ready
+- **Resource monitoring**: Use Prometheus + Grafana
+- **Auto-scaling**: Scale based on session demand
+
+### 🚀 UPDATE (I've Added Backend Scaling)
+
+**[📖 See complete Scaling Guide →](./docs/SCALING.md)** for Redis coordination, load balancing, and multi-replica deployment instructions.
 
 ### 🏗️ Architecture
 
+#### Single Instance Flow
+
 ```
-User Clicks "Launch Browser"
+User → http://localhost:80 → Traefik ───→ Backend ──────→ Redis ───→ Create Browser Containers
+                        (Load Balancer)   (Unique Port Check + Session Storage)
+```
+
+#### Scaled Architecture (Multiple Replicas)
+
+```
+                               ┌─── Backend Replica 1 ───┐
+User Request at port 80 → Traefik ─ Backend Replica 2 ───┼─→ Redis → Browser Containers Creation
+                               └─── Backend Replica N ───┘
+                                            │
+                                   🔥 All backends share
+                                   Redis session storage
+                                   (sessionManager.js)
+```
+
+#### Detailed Session Creation Flow
+
+```
+1. User clicks "Launch Browser" on web interface
          ↓
-Backend generates unique session ID
+2. Request hits Traefik load balancer (port 80)
          ↓
-Docker container created with:
-- Xvfb (Virtual Display)
-- Fluxbox (Window Manager)
-- Chromium Browser
-- VNC Server
-- noVNC WebSocket Proxy
+3. Traefik routes to available backend replica (round-robin)
          ↓
-Container starts on random port (50000-60000)
+4. Backend generates unique session ID
          ↓
-User gets URL: http://localhost:PORT/vnc.html
+5. Backend queries Redis for available host port (atomic allocation in portAllocator.js)
          ↓
-User browses in isolated environment
+5.1. 🆕 Backend stores session data in Redis (sessionManager.js)
          ↓
-Session expires or user terminates
+6. Docker container created by the Backend with:
+   - Chrome Browser (gets loaded in RAM with Incognito mode)
+   - Xvfb (creates fake display/framebuffer of Chrome in the RAM with display number :99)
+   - Fluxbox (a window manager)
+   - VNC Server (runs on port 5900 & takes pixels from that fake monitor with display number :99)
+   - noVNC WebSocket Proxy (runs on port 8080, gets frames on VNC protocol from VNC server & send those frames to frontend[vnc.html])
          ↓
-Container automatically destroyed
+7. Container starts and binds 8080 to allocated host port
+         ↓
+8. User receives: http://localhost:PORT/vnc.html
+         ↓
+9. User browses in completely isolated environment
+         ↓
+10. Session expires (30min) OR user terminates
+         ↓
+11. Container destroyed + Port released back to Redis + **Session removed from Redis**
 ```
 
 ## 🚀 Quick Start
@@ -78,7 +108,7 @@ Container automatically destroyed
 - **Docker Desktop** (Windows/Mac) or **Docker Engine** (Linux)
 - **Node.js 18+** (optional, can use Docker)
 - **8GB+ RAM** recommended for multiple sessions
-- **Available ports**: 3000, 50000-60000
+- **Available ports**: 80, 8080, 50000-60000
 
 ### Installation
 
@@ -94,49 +124,70 @@ Container automatically destroyed
    **Windows**:
 
    ```cmd
-   setup.bat
+   ./scripts/setup.bat
    ```
 
    **Linux/Mac**:
 
    ```bash
-   chmod +x setup.sh
-   ./setup.sh
+   chmod +x ./scripts/setup.sh
+   ./scripts/setup.sh
    ```
 
-3. **Start the service**:
+3. **Start/Stop the service**:
 
    ```bash
    # Option 1: Docker Compose (recommended)
-   docker-compose up -d
+   docker compose build # To Build
+   docker compose up -d # To Start
+   docker compose down  # To Stop
 
    # Option 2: Manual
    node server.js
    ```
 
 4. **Open in browser**:
+
    ```
-   http://localhost:3000
+   http://localhost
+   ```
+
+   **Note**: API is now available on port 80 (via Traefik load balancer) instead of port 3000.
+
+5. **Check Server(s) Logs**:
+
+   ```bash
+   docker compose logs -f backend
    ```
 
 ## 📁 Project Structure
 
 ```
 disposable-browser-service/
-├── 📄 Dockerfile                # Browser container (Ubuntu + Chromium + VNC)
-├── 📄 Dockerfile.backend        # Backend service container
-├── 📄 docker-compose.yml        # Multi-container orchestration
+├── 📄 docker-compose.yml        # Root orchestration with include directive
 ├── 📄 package.json              # Node.js dependencies
-├── 📄 server.js                 # Main API server (Express.js)
-├── 📄 start.sh                  # Container startup script
-├── 📄 supervisord.conf          # Process management
-├── 📄 setup.sh/.bat             # Automated setup scripts
-├── 📄 start.bat                 # Quick start script
-├── 📄 test.sh/.bat              # Testing scripts
-├── 📁 public/
-│   └── 📄 index.html            # Beautiful web interface
 ├── 📄 README.md                 # Comprehensive documentation
-└── 📄 .gitignore                # Git ignore rules
+├── 📄 .gitignore                # Git ignore rules
+├── 📁 src/                      # Source code directory
+│   ├── 📄 server.js             # Main API server (Express.js + Redis coordinators)
+│   └── 📁 lib/                  # Shared libraries
+│       ├── 🆕 portAllocator.js  # Redis-based port coordination for scaling
+│       └── 🆕 sessionManager.js # Redis-based session storage for multi-backend coordination
+├── 📁 docker/                   # Docker configuration
+│   ├── 📄 Dockerfile            # Browser container (Ubuntu + Chrome + Xvbf + Fluxbox + VNC)
+│   ├── 📄 Dockerfile.backend    # Backend service container
+│   ├── 📄 docker-compose.yml    # Multi-container orchestration (supports scaling)
+│   ├── 📄 start.sh              # Container startup script
+│   └── 📄 supervisord.conf      # Process management
+├── 📁 docs/                     # Documentation
+│   └── 📄 SCALING.md            # Complete scaling guide & load balancing
+├── 📁 scripts/                  # Automation scripts
+│   ├── 📄 setup.sh/.bat         # Automated setup scripts
+│   └── 📄 test.sh/.bat          # Testing scripts
+└── 📁 public/                   # Static web assets
+    ├── 📄 index.html            # Beautiful web interface
+    ├── 📄 script.js             # Frontend JavaScript
+    └── 📄 style.css             # Frontend styles
 ```
 
 ## 🧪 Testing
@@ -148,14 +199,14 @@ The project includes comprehensive test scripts to verify API functionality and 
 **Windows**:
 
 ```cmd
-test.bat
+./scripts/test.bat
 ```
 
 **Linux/Mac**:
 
 ```bash
-chmod +x test.sh
-./test.sh
+chmod +x ./scripts/test.sh
+./scripts/test.sh
 ```
 
 ### What the Tests Cover
@@ -166,24 +217,6 @@ chmod +x test.sh
 - ✅ **Session Management**: Tests session info retrieval and cleanup
 - ✅ **Statistics**: Verifies session statistics endpoint
 - ✅ **Error Handling**: Tests error responses and edge cases
-
-### Test Output Example
-
-```
-🧪 Testing Disposable Browser Service API
-=======================================
-1. Testing health check...
-✅ Health check passed
-2. Testing stats endpoint...
-✅ Stats endpoint working
-3. Creating browser session...
-✅ Session created successfully
-4. Testing session info...
-✅ Session info retrieved
-5. Cleaning up session...
-✅ Session terminated successfully
-All tests passed! 🎉
-```
 
 ## 🔧 Configuration
 
@@ -259,27 +292,6 @@ GET /api/sessions/stats
 GET /api/health
 ```
 
-## 📈 Performance & Scaling
-
-### Resource Usage (per session)
-
-- **Per session**: ~512MB RAM, 0.5-1 CPU core
-- **50 sessions**: ~25GB RAM, 25-50 CPU cores
-- **Startup time**: ~5-10 seconds
-- **Network**: ~10Mbps per active session
-- **Storage**: Minimal (containers are ephemeral)
-
-### Scaling Recommendations
-
-- **Small deployment**: 1 server, 10-20 sessions
-- **Medium deployment**: 3-5 servers, 100-500 sessions
-- **Large deployment**: Kubernetes cluster, 1000+ sessions
-- **Horizontal scaling**: Run multiple backend instances
-- **Load balancing**: Use Nginx or HAProxy
-- **Container pre-warming**: Keep idle containers ready
-- **Resource monitoring**: Use Prometheus + Grafana
-- **Auto-scaling**: Scale based on session demand
-
 ## 🛡️ Security Features
 
 ### Container Security
@@ -289,173 +301,62 @@ GET /api/health
 - **No new privileges**: Prevents privilege escalation
 - **Resource limits**: CPU and memory constraints
 - **Network isolation**: Containers use bridge network
-- **AppArmor/SELinux**: Additional kernel-level security
 
 ### Application Security
 
-- **Auto-removal**: Containers are automatically removed
+- **Auto-removal**: Orphan Containers are automatically removed
 - **Session timeout**: Forced cleanup after 30 minutes
-- **Input validation**: All API inputs are validated
 - **CORS protection**: Cross-origin request security
 - **Helmet.js**: Security headers middleware
 - **Incognito mode**: No browsing data persistence
-
-## 🔧 Production Deployment
-
-### Docker Compose Production
-
-```yaml
-version: "3.8"
-services:
-  disposable-browser:
-    image: your-registry/disposable-browser:latest
-    restart: unless-stopped
-    ports:
-      - "80:3000"
-    environment:
-      - NODE_ENV=production
-      - MAX_SESSIONS=200
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-```
-
-### Nginx Reverse Proxy
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # Proxy WebSocket connections for noVNC
-    location ~ ^/vnc/ {
-        proxy_pass http://localhost:$1;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
-
-### Kubernetes Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: disposable-browser
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: disposable-browser
-  template:
-    metadata:
-      labels:
-        app: disposable-browser
-    spec:
-      containers:
-        - name: disposable-browser
-          image: your-registry/disposable-browser:latest
-          ports:
-            - containerPort: 3000
-          env:
-            - name: NODE_ENV
-              value: "production"
-          resources:
-            limits:
-              memory: "1Gi"
-              cpu: "1000m"
-            requests:
-              memory: "512Mi"
-              cpu: "500m"
-          volumeMounts:
-            - name: docker-sock
-              mountPath: /var/run/docker.sock
-      volumes:
-        - name: docker-sock
-          hostPath:
-            path: /var/run/docker.sock
-```
 
 ## 📊 Monitoring & Logging
 
 ### Health Monitoring
 
 ```bash
-# Check service health
-curl http://localhost:3000/api/health
+# Check service health (now shows consistent results across backends)
+curl http://localhost/api/health
 
-# Check active sessions
-curl http://localhost:3000/api/sessions/stats
+# Check active sessions (consistent count across all backend replicas)
+curl http://localhost/api/sessions
+
+# Check session statistics
+curl http://localhost/api/sessions/stats
 
 # Monitor Docker containers
 docker ps | grep browser-
+
+# Verify Redis session storage
+docker exec disposable-browser-service-redis-1 redis-cli KEYS "session:*"
 ```
 
-### Log Management
+### Server Log Management
+
+#### Real-time Server Logs
 
 ```bash
-# View backend logs
-docker-compose logs -f disposable-browser-backend
+# Follow backend service logs (recommended)
+docker compose logs -f backend
 
-# View container logs
+# Follow specific backend container logs
+docker logs -f disposable-browser-service-backend-1
+
+# Follow all services logs (backend + redis + traefik)
+docker compose logs -f
+
+# View last 100 lines of backend logs
+docker logs --tail 100 disposable-browser-service-backend-1
+```
+
+#### Individual Container Logs
+
+```bash
+# View browser container logs
 docker logs browser-<session-id>
 
 # System resource usage
 docker stats
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Port conflicts**:
-
-```bash
-# Check port usage
-netstat -tulpn | grep :3000
-```
-
-**Docker permission issues**:
-
-```bash
-# Add user to docker group
-sudo usermod -aG docker $USER
-```
-
-**Container startup failures**:
-
-```bash
-# Check container logs
-docker logs <container-name>
-
-# Check system resources
-docker system df
-```
-
-**VNC connection issues**:
-
-```bash
-# Test VNC connectivity
-telnet localhost <port>
-
-# Check firewall rules
-sudo ufw status
 ```
 
 ## 🔄 Updates & Maintenance
@@ -467,22 +368,9 @@ sudo ufw status
 git pull origin main
 
 # Rebuild containers
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-### Cleanup
-
-```bash
-# Remove orphaned containers
-docker container prune
-
-# Remove unused images
-docker image prune
-
-# Remove unused volumes
-docker volume prune
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ## 🤝 Contributing

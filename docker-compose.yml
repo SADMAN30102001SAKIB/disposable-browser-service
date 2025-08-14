@@ -1,22 +1,5 @@
-version: "3.8"
+# Main docker-compose.yml - References the docker/ folder configuration
+# This allows running `docker compose up` from the root directory
 
-services:
-  disposable-browser-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    ports:
-      - "3000:3000"
-      - "50000-60000:50000-60000" # Port range for browser containers
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock # Access to Docker daemon
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-    restart: unless-stopped
-    networks:
-      - disposable-browser-network
-
-networks:
-  disposable-browser-network:
-    driver: bridge
+include:
+  - docker/docker-compose.yml

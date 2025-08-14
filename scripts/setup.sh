@@ -14,12 +14,6 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ Docker Compose is not installed. Please install Docker Compose first."
-    exit 1
-fi
-
 # Check if Docker daemon is running
 if ! docker info &> /dev/null; then
     echo "❌ Docker daemon is not running. Please start Docker first."
@@ -39,24 +33,12 @@ else
     exit 1
 fi
 
-# Install Node.js dependencies
-echo "📦 Installing Node.js dependencies..."
-if command -v npm &> /dev/null; then
-    npm install
-    echo "✅ Dependencies installed successfully"
-else
-    echo "⚠️  npm not found. Will use Docker for backend."
-fi
-
-# Create logs directory
-mkdir -p logs
-
 echo ""
 echo "🎉 Setup completed successfully!"
 echo ""
 echo "🚀 To start the service:"
 echo "   Option 1 - Using Docker Compose (recommended):"
-echo "   docker-compose up -d"
+echo "   docker compose up -d"
 echo ""
 echo "   Option 2 - Manual start:"
 echo "   1. Start backend: node server.js"
