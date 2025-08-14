@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Disposable Browser Service</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🌐 Disposable Browser</h1>
+        <p>Launch secure, temporary browser sessions in isolated containers</p>
+      </div>
+
+      <div class="stats" id="stats">
+        <div class="stat-item">
+          <div class="stat-number" id="activeSessions">-</div>
+          <div class="stat-label">Active Sessions</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" id="availablePorts">-</div>
+          <div class="stat-label">Available Slots</div>
+        </div>
+      </div>
+
+      <button class="browser-button" id="launchBtn">
+        🚀 Launch New Browser
+      </button>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        Creating your disposable browser session...
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="session-info" id="sessionInfo">
+        <h3>🎉 Your Browser is Ready!</h3>
+        <p>Session ID: <span id="sessionId"></span></p>
+        <div class="session-url" id="sessionUrl"></div>
+        <div class="session-actions">
+          <button class="btn btn-primary" id="openBrowserBtn">
+            🌐 Open Browser
+          </button>
+          <button class="btn btn-danger" id="terminateSessionBtn">
+            🗑️ Terminate Session
+          </button>
+        </div>
+        <p style="margin-top: 1rem; color: #666; font-size: 0.9rem">
+          ⏰ Session will auto-expire in 30 minutes
+        </p>
+      </div>
+
+      <div class="features">
+        <h3>🔒 Security Features</h3>
+        <ul>
+          <li>Complete isolation - each session runs in its own container</li>
+          <li>No data persistence - everything is wiped when session ends</li>
+          <li>Resource limits - CPU and memory constraints prevent abuse</li>
+          <li>Auto-cleanup - sessions expire automatically after 30 minutes</li>
+          <li>Incognito mode - no browsing history or cookies saved</li>
+          <li>Sandboxed environment - secure from host system</li>
+        </ul>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
