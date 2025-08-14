@@ -1,18 +1,11 @@
-version: "3.8"
-
-# Unified compose file that handles both single instance and scaling
-# Single instance (default):  docker compose up
-# Multiple instances:         docker compose up --scale backend=3
-
 services:
   backend:
     build:
       context: ..
       dockerfile: docker/Dockerfile.backend
-    # Use expose instead of fixed ports for scaling compatibility
     expose:
       - "3000"
-    # Remove the problematic port range - Docker socket access handles dynamic ports
+    # Remove the problematic port range 50000-600000 - Docker socket access handles dynamic ports
     # Browser containers will get dynamically assigned ports
     environment:
       - NODE_ENV=production

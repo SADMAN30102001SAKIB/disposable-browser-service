@@ -386,34 +386,11 @@ docker compose up -d
 - **Issues**: GitHub Issues
 - **Email**: sadman30102001sakib@gmail.com
 
-## 🎯 Roadmap
+## 🎯 Future Roadmap/Vision
 
-### ✅ Next Steps & Improvements
+For detailed development roadmap including bug fixes, performance optimizations, new features, and enterprise enhancements, see:
 
-#### Immediate Enhancements
-
-- [ ] **Authentication**/user management
-- [ ] **Browser extension**
-- [ ] File **upload/download** functionality
-- [ ] **Persistent bookmarks** (optional)
-- [ ] Mobile browser simulation
-
-#### Advanced Features
-
-- [ ] **Multiple browser engines** (Firefox, Edge)
-- [ ] **Screen recording** capabilities
-- [ ] **WebRTC** streaming for lower latency
-- [ ] GPU acceleration support
-
-#### Production Hardening
-
-- [ ] SSL/TLS encryption
-- [ ] Rate limiting and DDoS protection
-- [ ] Centralized logging and monitoring
-- [ ] Automated backup and recovery
-- [ ] Multi-region deployment
-- [ ] **Kubernetes operator**
-- [ ] **Metrics dashboard**
+**[📋 Complete Development Roadmap →](./docs/ROADMAP.md)**
 
 ---
 
